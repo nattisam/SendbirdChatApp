@@ -7,15 +7,23 @@ import 'package:get/get.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 import 'package:sendbird_chat_sample/component/widgets.dart';
 import 'package:sendbird_chat_sdk/sendbird_chat_sdk.dart';
+import 'package:sendbird_chat_sample/page/user/user_page.dart';
 
 class OpenChannelPage extends StatefulWidget {
-  const OpenChannelPage({Key? key}) : super(key: key);
+  final String userId;
+
+  const OpenChannelPage({Key? key, required this.userId}) : super(key: key);
 
   @override
-  State<OpenChannelPage> createState() => OpenChannelPageState();
+  State<OpenChannelPage> createState() => OpenChannelPageState(userId: userId);
 }
 
+
+
 class OpenChannelPageState extends State<OpenChannelPage> {
+  final String userId;
+  OpenChannelPageState({required this.userId});
+  
   final channelUrl = Get.parameters['channel_url']!;
   final itemScrollController = ItemScrollController();
   final textEditingController = TextEditingController();
@@ -71,6 +79,7 @@ class OpenChannelPageState extends State<OpenChannelPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.black,
       appBar: AppBar(
         title: Widgets.pageTitle(title, maxLines: 2),
         actions: const [],
@@ -79,7 +88,7 @@ class OpenChannelPageState extends State<OpenChannelPage> {
         children: [
           participantCount != null ? _participantIdBox() : Container(),
           hasPrevious ? _previousButton() : Container(),
-          Expanded(child: messageList.isNotEmpty ? _list() : Container()),
+          Expanded(child: messageList.isNotEmpty ? _list(userId) : Container()),
           _messageSender(),
         ],
       ),
@@ -131,121 +140,124 @@ class OpenChannelPageState extends State<OpenChannelPage> {
     );
   }
 
-  Widget _list() {
-    return ScrollablePositionedList.builder(
-      physics: const ClampingScrollPhysics(),
-      initialScrollIndex: messageList.length - 1,
-      itemScrollController: itemScrollController,
-      itemCount: messageList.length,
-      itemBuilder: (BuildContext context, int index) {
-        if (index >= messageList.length) return Container();
+Widget _list(String userId) {
+  return ScrollablePositionedList.builder(
+    physics: const ClampingScrollPhysics(),
+    initialScrollIndex: messageList.length - 1,
+    itemScrollController: itemScrollController,
+    itemCount: messageList.length,
+    itemBuilder: (BuildContext context, int index) {
+      if (index >= messageList.length) return Container();
 
-        BaseMessage message = messageList[index];
+      BaseMessage message = messageList[index];
+      bool isMyMessage = message.sender?.userId == widget.userId;
 
-        return GestureDetector(
-          onDoubleTap: () async {
-            final openChannel = await OpenChannel.getChannel(channelUrl);
-            Get.toNamed(
-                    '/message/update/${openChannel.channelType.toString()}/${openChannel.channelUrl}/${message.messageId}')
-                ?.then((message) async {
-              if (message != null) {
-                for (int index = 0; index < messageList.length; index++) {
-                  if (messageList[index].messageId == message.messageId) {
-                    setState(() => messageList[index] = message);
-                    break;
-                  }
-                }
-              }
-            });
-          },
-          onLongPress: () async {
-            final openChannel = await OpenChannel.getChannel(channelUrl);
-            await openChannel.deleteMessage(message.messageId);
-            setState(() {
-              messageList.remove(message);
-              title = '${openChannel.name} (${messageList.length})';
-            });
-          },
-          child: Column(
-            children: [
-              ListTile(
-                title: Text(
-                  message.message,
-                  style: const TextStyle(
-                    color: Colors.black,
+      return Align(
+        alignment: isMyMessage ? Alignment.centerRight : Alignment.centerLeft,
+        child: Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: Container(
+            padding: const EdgeInsets.all(8.0),
+            decoration: BoxDecoration(
+              color: isMyMessage ? Colors.red : Colors.grey,
+              borderRadius: BorderRadius.circular(12.0),
+            ),
+            child: Text(
+              message.message,
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ),
+      );
+    },
+  );
+}
+
+
+Widget _messageSender() {
+  return Padding(
+    padding: const EdgeInsets.all(8.0),
+    child: Stack(
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 30.0,
+              height: 30.0,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(15.0),
+              ),
+              child: Center(
+                child: Text(
+                  '+',
+                  style: TextStyle(
+                    fontSize: 20.0,
                     fontWeight: FontWeight.bold,
+                    color: Colors.white,
                   ),
                 ),
-                subtitle: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Widgets.imageNetwork(
-                        message.sender?.profileUrl, 16.0, Icons.account_circle),
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.only(left: 4.0),
-                        child: Text(
-                          message.sender?.userId ?? '',
-                          style: const TextStyle(fontSize: 12.0),
-                        ),
+              ),
+            ),
+            const SizedBox(width: 8.0),
+            Expanded(
+              child: Widgets.textField(
+                textEditingController,
+                'Message',
+              ),
+            ),
+          ],
+        ),
+        Positioned(
+          right: 13.0,
+          bottom: 13.0,
+          child: Container(
+            width: 30.0,
+            height: 30.0,
+            child: Material(
+              shape: const CircleBorder(),
+              elevation: 4.0,
+              child: Center(
+                child: ElevatedButton(
+                  onPressed: () async {
+                    if (textEditingController.value.text.isEmpty) {
+                      return;
+                    }
+
+                    openChannel?.sendUserMessage(
+                      UserMessageCreateParams(
+                        message: textEditingController.value.text,
                       ),
-                    ),
-                    Container(
-                      margin: const EdgeInsets.only(left: 16),
-                      alignment: Alignment.centerRight,
-                      child: Text(
-                        DateTime.fromMillisecondsSinceEpoch(message.createdAt)
-                            .toString(),
-                        style: const TextStyle(fontSize: 12.0),
-                      ),
-                    ),
-                  ],
+                      handler: (UserMessage message, SendbirdException? e) async {
+                        if (e != null) {
+                          await _showDialogToResendUserMessage(message);
+                        } else {
+                          _addMessage(message);
+                        }
+                      },
+                    );
+
+                    textEditingController.clear();
+                  },
+                  child: const Icon(Icons.arrow_upward),
+                  style: ElevatedButton.styleFrom(
+                    padding: EdgeInsets.zero,
+                    shape: const CircleBorder(),
+                  ),
                 ),
               ),
-              const Divider(height: 1),
-            ],
+            ),
           ),
-        );
-      },
-    );
-  }
+        ),
+      ],
+    ),
+  );
+}
 
-  Widget _messageSender() {
-    return Padding(
-      padding: const EdgeInsets.all(8.0),
-      child: Row(
-        children: [
-          Expanded(
-            child: Widgets.textField(textEditingController, 'Message'),
-          ),
-          const SizedBox(width: 8.0),
-          ElevatedButton(
-            onPressed: () async {
-              if (textEditingController.value.text.isEmpty) {
-                return;
-              }
 
-              openChannel?.sendUserMessage(
-                UserMessageCreateParams(
-                  message: textEditingController.value.text,
-                ),
-                handler: (UserMessage message, SendbirdException? e) async {
-                  if (e != null) {
-                    await _showDialogToResendUserMessage(message);
-                  } else {
-                    _addMessage(message);
-                  }
-                },
-              );
 
-              textEditingController.clear();
-            },
-            child: const Text('Send'),
-          ),
-        ],
-      ),
-    );
-  }
 
   Future<void> _showDialogToResendUserMessage(UserMessage message) async {
     await showDialog(

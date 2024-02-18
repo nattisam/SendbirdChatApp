@@ -147,7 +147,7 @@ class MyApp extends StatelessWidget {
         ),
         GetPage(
           name: '/open_channel/:channel_url',
-          page: () => const OpenChannelPage(),
+          page: () => OpenChannelPage(userId: 'your_user_id_here'),
         ),
         GetPage(
           name: '/message/update/:channel_type/:channel_url/:message_id',

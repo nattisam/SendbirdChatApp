@@ -4,6 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 class Widgets {
+  static const double _borderRadiusValue = 50.0;
+  static const BorderRadius _circularBorderRadius = BorderRadius.all(Radius.circular(_borderRadiusValue));
+  
   static Text pageTitle(
     String title, {
     int? maxLines,
@@ -45,8 +48,9 @@ class Widgets {
       controller: controller,
       decoration: InputDecoration(
         enabledBorder: const OutlineInputBorder(
-          borderSide: BorderSide(color: Colors.purple),
-        ),
+          borderSide: BorderSide(color: Colors.white),
+          borderRadius: _circularBorderRadius,
+         ),
         labelText: labelText,
       ),
       maxLines: maxLines ?? 1,
